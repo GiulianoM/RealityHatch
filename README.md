@@ -29,6 +29,12 @@ This repository contains the diagnostic API-layer stub, lifecycle tests, Windows
 
 The launchers and SC test scripts currently contain PC2-specific Pimax and game installation paths; adjust them for another machine. Development certificate creation and trust are explicit setup actions, described in [DEVELOPMENT-SIGNING.md](DEVELOPMENT-SIGNING.md).
 
+## AI-assisted development
+
+RealityHatch is developed with assistance from OpenAI Codex and other AI tools, including contributions to code, scripts, documentation, research, and debugging. AI-assisted work can contain errors; its use does not establish correctness, hardware compatibility, or anti-cheat acceptance. Feature and test claims should be read alongside the documented validation results and known limitations.
+
+Commits made with Codex assistance include a `Co-authored-by: Codex <codex@openai.com>` trailer. This attribution does not imply endorsement by OpenAI.
+
 ## Third-party components
 
 Khronos OpenXR headers, loader and hello_xr are separate upstream components with their own licensing; see the upstream license files. This repository does not include the downloaded OpenXR checkout, Vulkan SDK, vendor runtime/loader DLLs or diagnostic utilities. Fetch these separately using the build guide. RealityHatch's MIT License does not replace their licences.
