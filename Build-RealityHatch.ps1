@@ -11,6 +11,7 @@ if ($LASTEXITCODE -ne 0) { throw 'RealityHatch configure failed.' }
 & $cmake --build $build --config Release --parallel 8 2>&1 | Tee-Object (Join-Path $build 'build.log')
 if ($LASTEXITCODE -ne 0) { throw 'RealityHatch build failed.' }
 Write-Host 'Built bin\layers\RealityHatchLayer.dll and its manifest.'
-if (!$NoSign -and (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.local\development-certificate.json'))) {
+if (!$NoSign -and ((Test-Path -LiteralPath (Join-Path $PSScriptRoot '.local\certum-signing.json')) -or
+    (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.local\development-certificate.json')))) {
     & (Join-Path $PSScriptRoot 'Sign-RealityHatch.ps1')
 }

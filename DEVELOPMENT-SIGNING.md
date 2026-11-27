@@ -1,6 +1,29 @@
-# Local development signing on PC2
+# Certum and development signing on PC2
 
-RealityHatch uses a dedicated self-signed development certificate for the current Windows user on PC2. This is a local experiment, not a publicly trusted release signature.
+RealityHatch now defaults to Certum smartcard signing on PC2 when `.local\certum-signing.json` is present. The dedicated self-signed development certificate remains available explicitly for development.
+
+## Certum smartcard signing, 27 November 2026
+
+Windows detected the issued certificate on the cryptoCertum3.6 card in the ACS ACR40T reader. Its public certificate was registered in the current-user personal (`My`) store and associated with the existing key through Microsoft Smart Card Key Storage Provider. The private key stays on the card; no PIN or private key is saved in project files. No Root or TrustedPublisher entries were added for this certificate.
+
+- Signer: Open Source Developer Giuliano Moschini.
+- Issuer: Certum Code Signing 2021 CA.
+- Thumbprint: `5FBBF23407B4D1FA07A559C132626AF32CAE8CB1`.
+- Certificate expires 27 November 2027, 20:31:19 UTC.
+
+```powershell
+.\Sign-RealityHatch.ps1 -SigningProfile Certum
+```
+
+The default `Auto` profile chooses Certum when configured, otherwise the development profile. Once Certum is selected, missing card/key access, invalid certificate, timestamp failure or verification failure stops signing; there is no fallback to self-signing. `-SigningProfile Development` explicitly selects the old development certificate. Builds use the same automatic selection unless `-NoSign` is supplied. The card may request its PIN through Windows; do not pass it on the command line or store it in configuration.
+
+Certum signing selects the exact thumbprint, uses SHA-256 and RFC 3161 timestamping at `http://time.certum.pl` with SHA-256, then verifies using SignTool and PowerShell Authenticode, including timestamp presence. A copy of the pre-signing DLL is retained next to the signing transcript for comparison. Only the RealityHatch layer is signed; vendor binaries are unchanged.
+
+First public signing succeeded with zero SignTool warnings/errors; Authenticode status was `Valid`, and the Certum timestamp was verified. Full-file SHA-256: `0D478917222D37448750CA86F18CB2441B00663082202723893A211C83AC5C10`. Evidence: `logs\signing-20261127-153710-828.log` and `.json`. Local public-certificate/provider diagnostics are in `.local\certum`; signing configuration contains public identity information only in `.local\certum-signing.json`.
+
+The publicly signed DLL passed the normal-launcher SC/EAC startup test with native Pimax OpenXR on 27 November 2026: successful negotiation, session creation and at least 8,400 forwarded frames, with the user confirming the game UI in VR. Evidence: `logs\sc-eac-20261127-155150`. See [SC/EAC results](SC-EAC-TEST.md). The public signature has not been separately retested in hello_xr; earlier hello_xr tests used the development signature. Future camera/composition code still requires validation.
+
+References: [Certum SignTool instructions](https://files.certum.eu/documents/manual_en/Signing_with_the_use_of_jarsigner_tool_and_signtool.pdf), [Microsoft SignTool](https://learn.microsoft.com/windows/win32/seccrypto/signtool).
 
 ## Create and trust
 
@@ -12,12 +35,12 @@ The script creates `CN=RealityHatch Development (PC2)` in `Cert:\CurrentUser\My`
 
 The public certificate and thumbprint metadata are in `.local`. No PFX or private key is exported. `.local`, PFX and P12 files are excluded by `.gitignore`. Re-running setup reuses the recorded certificate rather than creating another one.
 
-## Sign and verify
+## Development profile: sign and verify
 
 For the separately requested machine-wide trust experiment on PC2, run `Trust-DevelopmentCertificateMachine.ps1` as administrator. It validates the existing public certificate's identity and imports only that certificate into Local Machine `Root` and `TrustedPublisher`. It saves `logs\machine-certificate-trust-*.log` and `.json`, plus `.local\machine-certificate-trust.json`. This was completed on 23 November 2026; no private key was moved or exported.
 
 ```powershell
-.\Sign-RealityHatch.ps1
+.\Sign-RealityHatch.ps1 -SigningProfile Development
 ```
 
 SignTool selects the exact thumbprint in the current-user `My` store and signs `bin\layers\RealityHatchLayer.dll` using SHA-256. It then runs `signtool verify /pa /all /v` and verifies the signer and `Valid` Authenticode status again in PowerShell. Vendor DLLs and hello_xr are not re-signed. Development signatures are not timestamped and expire with the development certificate; use trusted timestamps for releases.

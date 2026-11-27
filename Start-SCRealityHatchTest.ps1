@@ -8,14 +8,18 @@ if ($env:EOS_USE_ANTICHEATCLIENTNULL -and $env:EOS_USE_ANTICHEATCLIENTNULL -ne '
 }
 $dll = Join-Path $PSScriptRoot 'bin\layers\RealityHatchLayer.dll'
 $signature = Get-AuthenticodeSignature -LiteralPath $dll
-$certificate = Get-Content -LiteralPath (Join-Path $PSScriptRoot '.local\development-certificate.json') -Raw | ConvertFrom-Json
+$certumConfig = Join-Path $PSScriptRoot '.local\certum-signing.json'
+$publicSigning = Test-Path -LiteralPath $certumConfig
+$certificatePath = if ($publicSigning) { $certumConfig } else { Join-Path $PSScriptRoot '.local\development-certificate.json' }
+$certificate = Get-Content -LiteralPath $certificatePath -Raw | ConvertFrom-Json
 $trustStores = @(foreach ($store in @('Cert:\CurrentUser\Root','Cert:\CurrentUser\TrustedPublisher','Cert:\LocalMachine\Root','Cert:\LocalMachine\TrustedPublisher')) {
     [ordered]@{store=$store;present=(Test-Path -LiteralPath (Join-Path $store $certificate.thumbprint))}
 })
 $machineTrusted = @($trustStores | Where-Object { $_.store -like 'Cert:\LocalMachine\*' -and $_.present }).Count -eq 2
 if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $certificate.thumbprint) {
-    throw 'The layer must validate with the recorded development certificate before this test.'
+    throw 'The layer must validate with the configured signing certificate before this test.'
 }
+if ($publicSigning -and !$signature.TimeStamperCertificate) { throw 'The public-signed layer requires a verified timestamp.' }
 $runPrefix = if ($WithoutLayer) {'logs\sc-eac-control-'} else {'logs\sc-eac-'}
 $directory = Join-Path $PSScriptRoot ($runPrefix + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Path $directory -Force | Out-Null
@@ -29,7 +33,11 @@ $metadata = [ordered]@{
     signatureStatus = $signature.Status.ToString()
     signerSubject = $signature.SignerCertificate.Subject
     signerThumbprint = $signature.SignerCertificate.Thumbprint
-    trustScope = if ($machineTrusted) {'CurrentUser + LocalMachine Root/TrustedPublisher'} else {'CurrentUser'}
+    signingProfile = if ($publicSigning) {'Certum'} else {'Development'}
+    signerIssuer = $signature.SignerCertificate.Issuer
+    timestampSubject = if ($signature.TimeStamperCertificate) {$signature.TimeStamperCertificate.Subject} else {$null}
+    timestamped = [bool]$signature.TimeStamperCertificate
+    trustScope = if ($publicSigning) {'Public CA; Authenticode verified'} elseif ($machineTrusted) {'CurrentUser + LocalMachine Root/TrustedPublisher'} else {'CurrentUser'}
     certificateTrustStores = $trustStores
     runtimeManifest = 'C:\Program Files\Pimax\Runtime\PiOpenXR_64.json'
     manifest = Join-Path $PSScriptRoot 'bin\layers\RealityHatch.json'
@@ -52,7 +60,8 @@ Start-Transcript -LiteralPath (Join-Path $directory 'monitor.log') | Out-Null
 try {
     $artifacts = Join-Path $directory 'artifacts'
     New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
-    Copy-Item -LiteralPath $dll,$metadata.manifest,(Join-Path $PSScriptRoot '.local\RealityHatch-Development.cer') -Destination $artifacts
+    Copy-Item -LiteralPath $dll,$metadata.manifest -Destination $artifacts
+    [IO.File]::WriteAllBytes((Join-Path $artifacts 'signer.cer'), $signature.SignerCertificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
     if ($CaptureDebugOutput) {
         $captureTool = Join-Path $PSScriptRoot 'tools\DebugView\dbgviewcli64.exe'
         $captureSignature = Get-AuthenticodeSignature -LiteralPath $captureTool

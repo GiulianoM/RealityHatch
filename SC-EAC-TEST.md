@@ -1,4 +1,22 @@
-# SC/EAC self-signed layer test — 23 November 2026
+# SC/EAC layer tests
+
+## Certum-signed loading test — 27 November 2026
+
+**Awake-headset repeat passed VR session and frame forwarding.** Evidence: `logs\sc-eac-20261127-155150\RESULT.md` and `result.json`, immutable `realityhatch-at-monitor-end.log`, external loader/debug capture, process/service samples and Game/EAC/RSI snapshots. The same publicly signed DLL was used. Game PID 34828 completed negotiation and instance creation at 20:54:13.448–449 UTC, created a Pimax session at 20:54:16.278 UTC, and forwarded at least 8,400 frames successfully by monitoring end, with no negative-result layer events. SC logged Pimax Crystal Super/native Pimax OpenXR and `VR: DISABLED -> ENABLED`; EAC's bootstrapper recorded successful in-game loading at 20:54:06.813 UTC. The user confirmed seeing the game UI in VR. Capture/monitoring stopped normally; the game was left running.
+
+This validates the diagnostic layer's startup/menu forwarding in this configuration. It does not test gameplay-server acceptance or the future camera/composition implementation. The earlier asleep-headset run below remains useful comparison evidence.
+
+After capture, the game was closed normally through its Quit Game confirmation at the user's request. Raw evidence stays local and is excluded from Git; the results and artifact identities here are the published summary.
+
+The Certum-signed 0.1.2 deferred-state layer successfully loaded inside SC LIVE `4.10.3-live.13220821`, completed OpenXR negotiation and created an instance using native Pimax OpenXR with EAC enabled. Unlike the earlier self-signed runs, both RealityHatch's file log and external debug capture contain successful negotiation and instance markers.
+
+Evidence directory: `logs\sc-eac-20261127-153955`, including `RESULT.md`, `realityhatch.log`, `openxr-debugview.log`, `test.json`, process/service samples, exact signed artifacts, and before/during/after Game/EAC/RSI snapshots. Signer thumbprint: `5FBBF23407B4D1FA07A559C132626AF32CAE8CB1`; DLL SHA-256: `0D478917222D37448750CA86F18CB2441B00663082202723893A211C83AC5C10`.
+
+EAC's bootstrapper recorded successful in-game loading at 20:41:00.071 UTC. At 20:41:06.349–350 UTC, game PID 54148 logged `negotiation_entered`, `loader_negotiated`, `dispatch_state_ready`, `instance_created` and `runtime_properties` (`Pimax OpenXR`), all with result 0. SC then reported `No headset found`; the user confirmed the headset was asleep. Session creation and frame submission were therefore not exercised. SC reached its menu and was exited normally. No EAC configuration or global OpenXR settings were changed.
+
+That first run passed the layer-loading check but could not validate sessions or frames. The awake-headset repeat above now supplies that evidence. These results support the public-signing route without establishing a universal EAC rule or compatibility of future camera/rendering code.
+
+## Self-signed layer test — 23 November 2026
 
 Outcome: the self-signed RealityHatch layer failed loading with both current-user trust and, in a subsequent repeat, current-user plus Local Machine trust. Enabling it caused SC VR initialization to fail with a file-access error. Disabling it for a fresh normal-launcher control run restored native Pimax VR. The user visually confirmed the control launched in VR and the machine-trust repeat did not.
 

@@ -5,6 +5,7 @@
 /.local/
 /OpenXR-SDK-Source/
 /.vs/
+/.codex-attachments/
 /CMakeUserPresets.json
 .env
 .env.*

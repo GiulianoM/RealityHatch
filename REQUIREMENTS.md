@@ -1,6 +1,6 @@
 # RealityHatch initial requirements
 
-Recorded 22 November 2026. Updated 25 November 2026. Status: requirements and development record; minimal diagnostic API layer implemented and tested with hello_xr. Camera passthrough is not implemented yet.
+Recorded 22 November 2026. Updated 27 November 2026. Status: requirements and development record; minimal diagnostic API layer implemented and tested with hello_xr. Camera passthrough is not implemented yet.
 
 Provide stereoscopic SBS-camera passthrough for OpenXR VR applications so the user can see and operate real-world desk controls. Star Citizen is the primary target game environment; the software is not game-specific. The ordered ELP module is the initial test camera, not a brand or model requirement. Project name: RealityHatch. Description: "Calibrated stereo-camera passthrough for OpenXR VR applications."
 
@@ -15,8 +15,8 @@ Provide stereoscopic SBS-camera passthrough for OpenXR VR applications so the us
 | R5 | Build an OpenXR API layer with automatic loading after installation and configuration. |
 | R6 | Preserve compatibility with Star Citizen's Easy Anti-Cheat protections. Do not bypass or disable anti-cheat. |
 | R7 | Maintain the project on PC2 in D:\Projects\RealityHatch. |
-| R8 | Show passthrough as a desk-only region within the game view. |
-| R9 | Support both manual activation and automatic activation when looking down. |
+| R8 | Show desk passthrough in a camera-resolution window centered horizontally in the lower area of each eye view. Preserve separate left/right camera images and their aspect ratio. |
+| R9 | Use hotkey activation only: Left Alt + V toggles passthrough visibility. No look-down activation. |
 | R10 | Implement a custom OpenXR API layer in C++. |
 | R11 | Initially support SBS MJPEG capture and split each frame into corresponding left/right eye images. Verify supported capture modes on each camera; support for every format or camera is not implied. |
 | R12 | Use OpenCV camera and stereo calibration to correct lens distortion and rectify the eye images. |
@@ -25,6 +25,14 @@ Provide stereoscopic SBS-camera passthrough for OpenXR VR applications so the us
 | R15 | Present camera imagery as a visual overlay. Drawing over rendered eye images is permitted; do not modify game executables, game DLLs, executable code in memory, or gameplay logic. Use standard OpenXR layer loading and graphics APIs; do not bypass EAC. |
 | R16 | Develop and test outside Star Citizen using the stock Khronos hello_xr object scene with Vulkan graphics and the native Pimax runtime as the default. A custom room or spatial grids are not required. |
 | R17 | Use simple 3D box meshes around physical desk devices, such as a keyboard or joystick base, as the initial passthrough masks. Anchor each box to ArUco markers rigidly attached to its device so it follows the device's position and rotation. |
+
+## Manual activation and view window
+
+Confirmed 25 November 2026: use Left Alt + V as the default passthrough toggle, with hotkey activation only. Looking down does not change visibility. This supersedes the earlier Ctrl + Alt + V choice and automatic look-down requirement. Toggle visibility once per chord press, rather than repeatedly while held. Scope hotkey handling to the foreground VR application. Hotkey handling remains planned; the diagnostic stub does not implement it yet.
+
+The installed Star Citizen LIVE defaultProfile.xml contains no assignment for Left Alt + V or standalone Left Alt, and the local default profile contained no custom keyboard rebindings. Verify that the chord does not also trigger plain V's scanning/melee actions during integration testing.
+
+Place the view window at the horizontal center in the lower area of each eye view, fixed relative to the headset view. Use the selected camera mode's native per-eye resolution after splitting the SBS frame, preserve aspect ratio and stereo eye separation, and avoid unnecessary resampling. First approximation, confirmed 25 November 2026: with headset panels described by the user as roughly 4K per eye, start with a camera-resolution rectangle in the lower center; defer angular-size tuning and precise placement until visual headset testing. Use the actual OpenXR per-eye render dimensions for placement, since render dimensions can differ from physical panel resolution. This window layout does not remove the previously selected device-mask requirements below.
 
 ## Device mask scope
 
@@ -40,7 +48,7 @@ Runtime composition is also under evaluation as of 23 November 2026; see [Runtim
 
 Camera SBS MJPEG capture -> MJPEG decode -> left/right split -> correction using OpenCV calibration -> Vulkan rendering into layer-owned OpenXR swapchains -> stereo desk composition submitted through xrEndFrame -> Pimax OpenXR runtime.
 
-Overlay clarification, 23 November 2026: prefer an additional alpha-blended XrCompositionLayerProjection with distinct per-eye views, submitted after the game's existing layers. Render camera imagery and the desk mask into RealityHatch-owned swapchains. Pixels outside the desk mask are transparent. Manual and look-down activation control visibility. Drawing into rendered eye images is also permitted if needed for Pimax compatibility; the restriction is on modifying game code, not the rendered pixels. Both approaches use an in-process API layer. [Khronos projection layer reference](https://registry.khronos.org/OpenXR/specs/1.1/man/html/XrCompositionLayerProjection.html)
+Overlay clarification, 23 November 2026: prefer an additional alpha-blended XrCompositionLayerProjection with distinct per-eye views, submitted after the game's existing layers. Render camera imagery and the desk mask into RealityHatch-owned swapchains. Pixels outside the desk mask are transparent. The Left Alt + V hotkey toggles visibility; look-down activation is disabled. Drawing into rendered eye images is also permitted if needed for Pimax compatibility; the restriction is on modifying game code, not the rendered pixels. Both approaches use an in-process API layer. [Khronos projection layer reference](https://registry.khronos.org/OpenXR/specs/1.1/man/html/XrCompositionLayerProjection.html)
 
 Validate this mechanism with a transparent stereo test pattern on the installed native Pimax runtime before building the camera renderer: correct eye separation, additional projection-layer support, alpha blending, available layer count and the active view configuration. PassthroughForge reports that Pimax ignores overlay per-eye flags and consequently renders its stereo camera content directly into game frames. This is an allowed fallback; its report does not establish whether a separate stereo projection layer works on our runtime. Any direct Vulkan blending must respect OpenXR swapchain ownership and GPU synchronization: complete image access before forwarding release to the runtime, rather than writing to already released images at xrEndFrame. Avoiding game-code modification does not establish EAC acceptance; sign the in-process binaries and test the chosen rendering path with normal EAC enabled. [PassthroughForge v2.99.231 changelog](https://www.passthroughforge.com/changelog.html)
 
@@ -60,7 +68,7 @@ Research checked 22 November 2026.
 
 Decision: retain the custom C++ OpenXR API layer architecture. Signing is not an OpenXR loader requirement, but signing and EAC acceptance remain deployment dependencies to resolve for Star Citizen. No guarantee of EAC non-interference has been established for our custom DLL and its dependencies.
 
-Chosen certificate authority: Certum; intended product: Open Source Code Signing (updated by user decision, 25 November 2026). Rationale: OFXR Bridge reports successful Star Citizen EAC loading after signing, and inspection of its official v0.2.14.1 release found valid Authenticode signatures on all three executable binaries, issued by Certum Code Signing 2021 CA to Open Source Developer Julien Choulet. Certificate purchase and issuance remain pending. Verify EAC acceptance for RealityHatch's own signed binaries rather than assuming acceptance transfers from OFXR.
+Chosen certificate authority: Certum; intended product: Open Source Code Signing (updated by user decision, 25 November 2026). Rationale: OFXR Bridge reports successful Star Citizen EAC loading after signing, and inspection of its official v0.2.14.1 release found valid Authenticode signatures on all three executable binaries, issued by Certum Code Signing 2021 CA to Open Source Developer Julien Choulet. Certificate issued and installed on the activated smartcard, 27 November 2026. The RealityHatch layer was signed and timestamped with it; SignTool and PowerShell Authenticode verification passed. See [signing evidence and configuration](DEVELOPMENT-SIGNING.md). The publicly signed layer subsequently passed native Pimax SC/EAC startup, session creation and at least 8,400 successful frame forwards; the user confirmed the game UI in VR. See [SC/EAC evidence](SC-EAC-TEST.md). Camera/composition and gameplay-server validation remain outstanding. Verify EAC acceptance for RealityHatch's own signed binaries rather than assuming acceptance transfers from OFXR.
 
 Distribution decision, 25 November 2026: RealityHatch is already published on [GitHub](https://github.com/GiulianoM/RealityHatch) under the [MIT License](LICENSE), superseding the earlier private/closed-source requirement. Publication was confirmed by the user; the local LICENSE contains the MIT terms with copyright attributed to GiulianoM, and the origin remote points to that repository. Maintain public project information identifying the maintainer to support Certum verification. Preserve the license obligations of reused source and dependencies.
 
@@ -134,8 +142,8 @@ Remaining feasibility checks:
 
 ## Questions to complete the requirements
 
-1. How should the desk region be positioned and calibrated: anchored to the physical desk or fixed within the headset view?
-2. Which manual input should activate passthrough, should it be hold or toggle, and how should it interact with look-down activation?
+1. After testing the initial lower-center camera-resolution window, does its size or vertical offset need adjustment, and how should camera-to-eye alignment be calibrated?
+2. Should the passthrough window start hidden when a VR session begins?
 3. Which Star Citizen build and Pimax runtime version will be used for initial testing?
 4. What is the camera order/specification URL, and when is delivery expected?
 5. Which controls must be visible, at what distance, and under what desk lighting? Will the camera mount rigidly on the headset?
@@ -144,7 +152,7 @@ Remaining feasibility checks:
 ## Initial acceptance checks
 
 - With Star Citizen's native Vulkan VR mode and the Pimax OpenXR runtime, the configured layer loads automatically and displays passthrough only in the desk region within the game view.
-- Both manual activation and looking down reveal the desk region; deactivation follows the agreed interaction rules.
+- Left Alt + V toggles the lower-center passthrough window once per press. Looking down does not change visibility. The window preserves native camera per-eye resolution, aspect ratio and stereo separation.
 - The user can identify and operate the agreed desk controls at normal seated distance and lighting without removing the headset.
 - Measured latency and added frame time meet the agreed limits; stereo remains comfortable during normal head motion.
 - SBS decoding preserves stereo pairing; OpenCV calibration corrects distortion and alignment at the agreed desk distances.
